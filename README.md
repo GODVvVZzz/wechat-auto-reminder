@@ -37,5 +37,7 @@
 
 ## 🟡 还可以去天行数据申请别的接口
 
-## ✅ Feedback
-ayron1929@gmail.com
+## ✅ 单独执行测试方法
+```
+python -m unittest test.TestWeChatPush.test_get_access_token 
+```

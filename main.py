@@ -3,9 +3,8 @@ import sys, os
 from datetime import datetime, date
 from time import localtime
 
-def get_access_token():
-    app_id = config["app_id"]
-    app_secret = config["app_secret"]
+# 获取公众号access_token
+def get_access_token(app_id, app_secret):
     url = ("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={}&secret={}"
                 .format(app_id, app_secret))
     try:
@@ -16,12 +15,13 @@ def get_access_token():
         sys.exit(1)
     return access_token
 
-def get_weather(region):
+# 获取天气信息
+def get_weather(key, region):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
     }
-    key = config["weather_key"]
+    # 先查询城市位置
     region_url = "https://geoapi.qweather.com/v2/city/lookup?location={}&key={}".format(region, key)
     response = get(region_url, headers=headers).json()
     if response["code"] == "404":
@@ -34,6 +34,8 @@ def get_weather(region):
         sys.exit(1)
     else:
         location_id = response["location"][0]["id"]
+    
+    # 再查询该城市天气信息
     weather_url = "https://devapi.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
     response = get(weather_url, headers=headers).json()
     weather_day_text = response["daily"][0]["textDay"]
@@ -44,6 +46,7 @@ def get_weather(region):
     temp_min = response["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
     return weather_day_text, weather_day_icon, weather_night_text, weather_night_icon, temp_max, temp_min
 
+# 倒数日计算
 def get_day_left(day, year, today):
     day_year = day.split("-")[0]
     day_month = int(day.split("-")[1])
@@ -59,6 +62,7 @@ def get_day_left(day, year, today):
     if day_left == "0:00:00": day_left = 0
     return day_left
 
+# 金山词霸获取每日一句
 def get_ciba():
     url = "http://open.iciba.com/dsapi/"
     headers = {
@@ -77,6 +81,7 @@ def get_ciba():
     note_ch2 = note_ch[middle_ch:]
     return note_en1, note_en2, note_ch1, note_ch2
 
+# 通过微信公众号向指定用户推送消息
 def send_message(to_user, access_token, region_name, weather_day_text, weather_day_icon, weather_night_text, weather_night_icon, temp_max, temp_min, note_ch1, note_ch2, note_en1, note_en2, note_de1, note_de2):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
@@ -89,12 +94,16 @@ def send_message(to_user, access_token, region_name, weather_day_text, weather_d
     love_month = int(config["love_date"].split("-")[1])
     love_day = int(config["love_date"].split("-")[2])
     love_date = date(love_year, love_month, love_day)
+    # 在一起计时
     love_days = str(today.__sub__(love_date)).split(" ")[0]
+    # 纪念日剩余时间
     love_days_left = get_day_left(config["love_date"], year, today)
     if love_days_left == 0:
         love_days_data = "今天是纪念日哦，祝宝贝纪念日快乐！"
     else:
         love_days_data = "距离下个纪念日还有 {} 天".format(love_days_left)
+
+    # 这里为什么不直接取birthday 而采用遍历    
     birthdays = {}
     for k, v in config.items():
         if k[0:5] == "birth":
@@ -109,6 +118,8 @@ def send_message(to_user, access_token, region_name, weather_day_text, weather_d
         else:
             birthday_data1.append("距离<{}>生日还有 {} 天".format(value["name"], birthday_left))
             birthday_data2.append("")
+    
+    # 是否可以优化 直接发给要发的两个人？
     data = {
         "touser": to_user,
         "template_id": config["template_id"],
@@ -201,10 +212,15 @@ if __name__ == "__main__":
         os.system("pause")
         sys.exit(1)
  
-    access_token = get_access_token()
+    app_id = config["app_id"]
+    app_secret = config["app_secret"]
+    access_token = get_access_token(app_id, app_secret)
+
     users = config["user"]
     region = config["region"]
-    weather_day_text, weather_day_icon, weather_night_text, weather_night_icon, temp_max, temp_min = get_weather(region)
+    key = config["weather_key"]
+    weather_day_text, weather_day_icon, weather_night_text, weather_night_icon, temp_max, temp_min = get_weather(key, region)
+
     note_en1, note_en2, note_ch1, note_ch2 = get_ciba()
     if ((config["note_ch1"] != "") or (config["note_ch2"] != "")):
         note_ch1 = config["note_ch1"]
@@ -214,6 +230,7 @@ if __name__ == "__main__":
         note_en2 = config["note_en2"]
     note_de1 = config["note_de1"]
     note_de2 = config["note_de2"]
+    
     for user in users:
         send_message(user, access_token, region, weather_day_text, weather_day_icon, weather_night_text, weather_night_icon, temp_max, temp_min, note_ch1, note_ch2, note_en1, note_en2, note_de1, note_de2)
     os.system("pause")
